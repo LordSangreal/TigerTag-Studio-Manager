@@ -1,0 +1,139 @@
+name: Upstream sync
+
+# Keeps this fork on the latest RELEASE of the original app
+# (TigerTag-Project/TigerTag-Studio-Manager) while keeping the fork's own additions
+# (renderer/prices/: monitored prices, affiliate links and coupons from the Kanban price monitor).
+#
+# Every 6 hours (or on the "Run workflow" button):
+#   1. read the upstream's latest published release tag (vX.Y.Z);
+#   2. if this branch already contains it, stop;
+#   3. merge that tag into the default branch;
+#      • clean merge → run the quick checks and push it;
+#      • conflict    → push nothing and open (or update) an issue listing the conflicting files,
+#                      so the merge is finished by hand.
+#
+# The fork's additions live in their own folder and touch inventory.js / inventory.html in a few
+# lines only, so most releases merge without a conflict.
+#
+# Token: a release that changes files under .github/workflows/ cannot be pushed with the default
+# GITHUB_TOKEN (GitHub refuses workflow edits from it). Add a repository secret UPSTREAM_SYNC_TOKEN
+# (a fine-grained token on this repo with Contents: read/write and Workflows: read/write) to cover
+# those releases; without it the sync still works for every other release.
+
+on:
+  schedule:
+    - cron: '23 */6 * * *'   # every 6 hours, off the :00 rush
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Upstream tag to merge (empty = latest release)'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: upstream-sync
+  cancel-in-progress: false
+
+env:
+  UPSTREAM_REPO: TigerTag-Project/TigerTag-Studio-Manager
+
+jobs:
+  sync:
+    # Only in the fork: the original repo has nothing to sync from.
+    if: github.repository != 'TigerTag-Project/TigerTag-Studio-Manager'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.UPSTREAM_SYNC_TOKEN || github.token }}
+
+      - name: Find the upstream release
+        id: tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          tag="$INPUT_TAG"
+          if [ -z "$tag" ]; then
+            tag=$(gh api "repos/$UPSTREAM_REPO/releases/latest" --jq .tag_name)
+          fi
+          if [ -z "$tag" ]; then echo "No upstream release found"; exit 1; fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "Upstream release: $tag"
+
+      - name: Fetch it
+        run: |
+          git remote add upstream "https://github.com/$UPSTREAM_REPO.git"
+          git fetch --no-tags upstream "refs/tags/${{ steps.tag.outputs.tag }}:refs/upstream-tags/${{ steps.tag.outputs.tag }}"
+
+      - name: Already up to date?
+        id: check
+        run: |
+          if git merge-base --is-ancestor "refs/upstream-tags/${{ steps.tag.outputs.tag }}" HEAD; then
+            echo "up_to_date=true" >> "$GITHUB_OUTPUT"
+            echo "Already contains ${{ steps.tag.outputs.tag }} — nothing to do."
+          else
+            echo "up_to_date=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Merge
+        id: merge
+        if: steps.check.outputs.up_to_date == 'false'
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git merge --no-ff --no-edit -m "Merge upstream ${{ steps.tag.outputs.tag }}" "refs/upstream-tags/${{ steps.tag.outputs.tag }}"; then
+            echo "conflict=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "conflict=true" >> "$GITHUB_OUTPUT"
+            {
+              echo "files<<EOF"
+              git diff --name-only --diff-filter=U
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+            git merge --abort
+          fi
+
+      - uses: actions/setup-node@v5
+        if: steps.merge.outputs.conflict == 'false'
+        with:
+          node-version: 24
+
+      - name: Quick checks
+        if: steps.merge.outputs.conflict == 'false'
+        run: |
+          node scripts/check-i18n-consistency.mjs
+          node --check renderer/prices/index.js
+          node --check renderer/prices/strings.js
+          # the fork's hooks must still be in the merged files
+          grep -q "kanbanPricesHTML(r)" renderer/inventory.js
+          grep -q "kanbanStockBuyHTML(row)" renderer/inventory.js
+          grep -q "prices/prices.css" renderer/inventory.html
+
+      - name: Push
+        if: steps.merge.outputs.conflict == 'false'
+        run: git push origin "HEAD:${{ github.event.repository.default_branch }}"
+
+      - name: Open an issue on conflict
+        if: steps.merge.outputs.conflict == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.tag.outputs.tag }}
+          FILES: ${{ steps.merge.outputs.files }}
+        run: |
+          title="Upstream $TAG: merge needs a hand"
+          body=$(printf 'The automatic merge of upstream release **%s** stopped on a conflict, so nothing was pushed.\n\nConflicting files:\n\n```\n%s\n```\n\nTo finish it by hand:\n\n```\ngit remote add upstream https://github.com/%s.git\ngit fetch upstream tag %s\ngit merge %s\n# fix the files above, keep the fork lines (prices/), then commit and push\n```\n' "$TAG" "$FILES" "$UPSTREAM_REPO" "$TAG" "$TAG")
+          # Issues are off by default on a fork: then the red run (and its e-mail) is the alert.
+          num=$(gh issue list --state open --search "\"$title\" in:title" --json number --jq '.[0].number' 2>/dev/null || true)
+          if [ -n "$num" ]; then
+            gh issue comment "$num" --body "$body" || true
+          else
+            gh issue create --title "$title" --body "$body" || true
+          fi
+          echo "::error::Upstream $TAG conflicts in: $(echo $FILES)"
+          exit 1
