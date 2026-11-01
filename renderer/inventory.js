@@ -27,6 +27,7 @@ import { applyDealsFilter, dealsViewHtml, openChests, openCoinsCodeModal, openCo
 import { closePullStages, openPullStage } from './quests/coin-pull.js';
 import { squadHeroHtml, squadItemsHeroHtml, squadRankingsHtml, pulseHtml as squadPulseHtml, toggleLeague, leagueRows, setLeagueRows, rankNo } from './quests/squad-rankings.js';
 import { initTrophies, trophiesSignIn, trophiesSignOut, renderTrophiesView, trophyEarned } from './quests/trophies.js';
+import { initKanbanPrices, kanbanPricesHTML, kanbanStockBuyHTML } from './prices/index.js';
 import { initReferrals, referralsSignIn, referralsSignOut, renderInviteView, claimReferral, referralWantsCode, referralPrefill, referralStatus, wireCodeField, codeFieldMarkup, errText as referralErrText } from './quests/referrals.js';
 import { initQuests, questsSignIn, questsSignOut, questBump, questGauge, questPillLabel, questDailyProgress, questCurrentLevel, openQuests, renderQuestsView, questLootHtml, questFreezeStatus, questFriendFreeze, openFreezeFor, openFreezeGift } from './quests/index.js';
 
@@ -4386,6 +4387,7 @@ import { initReport, toggleReport, openReport, isReportOpen, reportDropFiles, re
     // A sticker saved from the album: the server counts it once (hidden download trophies).
     downloaded: id => { const uid = state.activeAccountId; if (uid) _tigerCoins(uid, "trophyDownload", { id }).catch(() => {}); },
   });
+  initKanbanPrices({ esc, lang: () => state.lang, toast: msg => _flashMessage(msg), openExternal: url => window.electronAPI?.openExternal ? window.electronAPI.openExternal(url) : window.open(url, "_blank", "noopener") });   // fork: monitored prices (renderer/prices/)
   // Referrals — the Invite view, the "Who invited you?" claim and its ceremony
   // (quests/referrals.js, docs/REFERRALS.md); every rule is server-side.
   initReferrals({
@@ -23734,6 +23736,7 @@ import { initReport, toggleReport, openReport, isReportOpen, reportDropFiles, re
       ${linksHtml}
       ${attachHtml}
       ${buySection}
+      ${kanbanPricesHTML(r)}
       ${infoHtml}
       ${(() => {
         // ── Toolbox — bundles every action available on this spool.
@@ -40725,7 +40728,7 @@ import { initReport, toggleReport, openReport, isReportOpen, reportDropFiles, re
       const tiles = stock.map(x => { const p = prodByKey.get(x.key), row = p ? _productAsRow(p) : null; return `
           <button type="button" class="nc-tile" data-stock-key="${esc(x.key)}">
             ${row ? thumbHTML(row, 40, { badges: false }) : x.img ? `<img src="${esc(x.img)}" alt="" onerror="this.style.visibility='hidden'">` : `<span class="nc-tile-ph"></span>`}
-            <span><b>${esc(x.title || "")}</b><small>${esc((String(x.text || "").match(/\d+\s*\/\s*\d+/) || [x.text || ""])[0])}</small></span>
+            <span><b>${esc(x.title || "")}</b><small>${esc((String(x.text || "").match(/\d+\s*\/\s*\d+/) || [x.text || ""])[0])}</small>${row ? kanbanStockBuyHTML(row) : ""}</span>
           </button>`; }).join("");
       items.push({ kind: "stock", at, html: card({ kind: "stock", accent: NOTIF_ACCENT.stock, fresh: stock.some(x => x.fresh),
         art: `<img src="../assets/img/notifications/low-stock.webp" alt="">`,   // the low-stock spool (docs/ART-DIRECTION.md)

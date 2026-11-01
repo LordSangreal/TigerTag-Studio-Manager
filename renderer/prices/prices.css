@@ -1,0 +1,59 @@
+/* prices/prices.css — "Monitored prices" section of the spool detail panel + the buy line of the
+   low-stock tiles (prices/index.js). Theme tokens only; the store colours come from the module. */
+.kp-section .kp-head { display: flex; align-items: center; justify-content: space-between; }
+.kp-gear { border: 0; background: transparent; padding: 2px; cursor: pointer; display: inline-flex; }
+.kp-gear .icon { background-color: var(--muted); }
+.kp-settings:not([hidden]) { display: flex; gap: 6px; margin-bottom: 8px; }
+.kp-settings .kp-url { flex: 1 1 auto; min-width: 0; }
+.kp-note { margin: 0 0 8px; font-size: 12px; color: var(--muted); }
+.kp-stats { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+.kp-stats small { color: var(--muted); font-size: 11px; }
+.kp-dot { width: 10px; aspect-ratio: 1; border-radius: 50%; flex-shrink: 0; }
+.kp-offers { display: flex; flex-direction: column; gap: 6px; }
+.kp-offer { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 10px; background: var(--surface-2); flex-wrap: wrap; }
+.kp-offer-main { display: flex; flex-direction: column; flex: 1 1 120px; min-width: 0; }
+.kp-offer-main b { font-size: 13px; color: var(--text); }
+.kp-offer-main small { font-size: 11px; color: var(--muted); }
+.kp-price { font-weight: 800; font-size: 14px; color: var(--text); white-space: nowrap; }
+.kp-offer .det-buy-link.kp-buy { flex: 0 0 auto; height: 32px; font-family: inherit; }
+.kp-coins { border: 1px solid var(--border-strong); background: var(--surface); color: var(--text); border-radius: 8px; height: 32px; padding: 0 8px; font-size: 12px; cursor: pointer; }
+.kp-sub { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; font-weight: 600; margin: 10px 0 6px; }
+.kp-coupons { display: flex; flex-direction: column; gap: 6px; }
+.kp-coupon { display: flex; align-items: center; gap: 8px; }
+.kp-coupon.is-ended { opacity: .55; }
+.kp-code { display: inline-flex; align-items: center; gap: 6px; border: 1px dashed var(--primary); background: var(--primary-soft); color: var(--text); border-radius: 8px; padding: 4px 8px; font-weight: 800; font-size: 12px; letter-spacing: .04em; cursor: pointer; font-family: inherit; }
+.kp-code .icon { background-color: var(--primary); }
+.kp-coupon-info { display: flex; flex-direction: column; font-size: 12px; color: var(--text); }
+.kp-coupon-info small { font-size: 11px; color: var(--muted); }
+.kp-nc-buy { display: inline-flex; align-items: center; gap: 4px; margin-top: 2px; font-size: 11px; font-weight: 700; color: var(--buy); cursor: pointer; }
+.kp-nc-buy .icon { background-color: var(--buy); }
+.kp-nc-buy:hover { color: var(--buy-hover); }
+
+/* The Kanban's price chart (kanban-promocoes-aliexpress app/static/style.css), same shapes and colours:
+   accent line + gradient + dashed average for one store, ser0…ser4 for several stores. */
+.kp-section { --kp-accent: #f26b1d; --kp-ok: #1f9d55; --kp-ser0: #f97316; --kp-ser1: #2563eb; --kp-ser2: #16a34a; --kp-ser3: #9333ea; --kp-ser4: #dc2626; }
+.kp-chart { position: relative; width: 100%; margin: 4px 0 10px; }
+.kp-chart .chart-svg { display: block; width: 100%; height: auto; overflow: visible; }
+.kp-chart .chart-svg .grid { stroke: var(--border); stroke-width: 1; opacity: .45; }
+.kp-chart .chart-svg .ax { fill: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.kp-chart .chart-svg .line { fill: none; stroke: var(--kp-accent); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.kp-chart .chart-svg .stop-top { stop-opacity: .30; } .kp-chart .chart-svg .stop-bottom { stop-opacity: 0; }
+.kp-chart .chart-svg .stop-top.acc { stop-color: var(--kp-accent); stop-opacity: .28; } .kp-chart .chart-svg .stop-bottom.acc { stop-color: var(--kp-accent); }
+.kp-chart .chart-svg .avg { stroke: var(--muted); stroke-width: 1.2; stroke-dasharray: 4 4; }
+.kp-chart .chart-svg .avg-lb { fill: var(--muted); }
+.kp-chart .chart-svg .dot { fill: var(--surface); stroke: var(--kp-accent); stroke-width: 2; }
+.kp-chart .chart-svg .dot.min { fill: var(--kp-ok); stroke: var(--surface); }
+.kp-chart .chart-svg .mk-lb { fill: var(--text); font-weight: 600; }
+.kp-chart .chart-svg .cross { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 2 3; }
+.kp-chart .chart-svg .hit { fill: transparent; cursor: crosshair; touch-action: pan-y; }
+.kp-chart .chart-tip { position: absolute; pointer-events: none; background: var(--surface-raised); border: 1px solid var(--border); border-radius: 8px;
+  box-shadow: var(--shadow); padding: 6px 9px; font-size: 12px; color: var(--muted); white-space: nowrap; z-index: 2; }
+.kp-chart .chart-tip[hidden] { display: none; }
+.kp-chart .chart-tip .tip-h { color: var(--text); font-weight: 700; font-size: 13px; }
+.kp-chart .series-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--muted); margin-top: 6px; }
+.kp-chart .series-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; vertical-align: -1px; }
+.kp-section .ser0 { --c: var(--kp-ser0); } .kp-section .ser1 { --c: var(--kp-ser1); } .kp-section .ser2 { --c: var(--kp-ser2); }
+.kp-section .ser3 { --c: var(--kp-ser3); } .kp-section .ser4 { --c: var(--kp-ser4); } .kp-section .acc { --c: var(--kp-accent); }
+.kp-chart .chart-svg .line[class*="ser"], .kp-chart .chart-svg .dot[class*="ser"] { stroke: var(--c); }
+.kp-chart .chart-svg stop[class*="ser"] { stop-color: var(--c); }
+.kp-chart .series-legend i, .kp-section .kp-dot { background: var(--c, var(--muted)); }
