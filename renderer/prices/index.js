@@ -17,17 +17,14 @@
  */
 
 import { STRINGS } from './strings.js';
+import { priceChartHTML, wireChartTips } from './chart.js';
 
 const URL_KEY = "tigertag.kanbanUrl";
 const CACHE_KEY = "tigertag.kanbanCache";
 const DEFAULT_URL = "https://kanban-thiago.duckdns.org";
 const MAX_AGE_MS = 5 * 60 * 1000;          // the server rebuilds its answer every 5 minutes
 const RETRY_MS = 60 * 1000;                 // after a failure, wait before asking again
-// Store colours (the stores' own brand colours) for the chart lines and the legend dots.
-// Shopee and Amazon get readable hues of their own so no two lines look alike in light or dark theme.
-const STORE_COLORS = { aliexpress: "#e62e04", shopee: "#ff8a00", mercadolivre: "#3483fa", amazon: "#9b59b6" };
 const STORE_NAMES = { aliexpress: "AliExpress", shopee: "Shopee", mercadolivre: "Mercado Livre", amazon: "Amazon" };
-const FALLBACK_COLORS = ["#3d8bff", "#a855f7", "#1aaf6c", "#ff7a18"];
 
 const host = {
   esc: s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]),
@@ -181,40 +178,12 @@ function when(iso) {
   if (isNaN(d)) return "";
   return d.toLocaleString(locale(), { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 }
-const storeColor = (store, i) => STORE_COLORS[store] || FALLBACK_COLORS[i % FALLBACK_COLORS.length];
-
-// ── chart: one line per store, last N days ───────────────────────────────────
-function chartSVG(history, days) {
-  const W = 320, H = 120, PAD_L = 40, PAD_R = 8, PAD_T = 8, PAD_B = 18;
-  const series = (history || []).filter(h => h.points?.length);
-  if (!series.length) return "";
-  const end = new Date(); end.setUTCHours(0, 0, 0, 0);
-  const start = end.getTime() - (days - 1) * 864e5;
-  const xs = d => PAD_L + ((Date.parse(d + "T00:00:00Z") - start) / ((days - 1) * 864e5)) * (W - PAD_L - PAD_R);
-  const all = series.flatMap(s => s.points.map(p => p[1]));
-  let lo = Math.min(...all), hi = Math.max(...all);
-  if (hi - lo < 1) { lo -= 1; hi += 1; }
-  const pad = (hi - lo) * 0.1; lo -= pad; hi += pad;
-  const ys = v => PAD_T + (1 - (v - lo) / (hi - lo)) * (H - PAD_T - PAD_B);
-  const grid = [hi - pad, (hi + lo) / 2, lo + pad].map(v =>
-    `<line class="kp-grid" x1="${PAD_L}" x2="${W - PAD_R}" y1="${ys(v).toFixed(1)}" y2="${ys(v).toFixed(1)}"/>` +
-    `<text class="kp-axis" x="${PAD_L - 4}" y="${(ys(v) + 3).toFixed(1)}" text-anchor="end">${Math.round(v)}</text>`).join("");
-  const lines = series.map((s, i) => {
-    const pts = s.points.filter(p => Date.parse(p[0] + "T00:00:00Z") >= start);
-    if (!pts.length) return "";
-    const c = storeColor(s.store, i);
-    const path = pts.map((p, j) => `${j ? "L" : "M"}${xs(p[0]).toFixed(1)},${ys(p[1]).toFixed(1)}`).join("");
-    const last = pts[pts.length - 1];
-    return `<path d="${path}" fill="none" stroke="${c}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>` +
-      `<circle cx="${xs(last[0]).toFixed(1)}" cy="${ys(last[1]).toFixed(1)}" r="3" fill="${c}"/>`;
-  }).join("");
-  const fmtDay = ms => new Date(ms).toLocaleDateString(locale(), { day: "2-digit", month: "2-digit", timeZone: "UTC" });
-  const axisX = `<text class="kp-axis" x="${PAD_L}" y="${H - 4}">${fmtDay(start)}</text>` +
-    `<text class="kp-axis" x="${W - PAD_R}" y="${H - 4}" text-anchor="end">${fmtDay(end.getTime())}</text>`;
-  const legend = series.map((s, i) =>
-    `<span class="kp-legend-item"><span class="kp-dot" style="background:${storeColor(s.store, i)}"></span>${host.esc(s.store_name || s.store)}</span>`).join("");
-  return `<div class="kp-chart"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${host.esc(tr("kpChartAria"))}">${grid}${lines}${axisX}</svg>` +
-    `<div class="kp-legend">${legend}</div></div>`;
+// Colour of each store = its chart line (the Kanban numbers stores in order of appearance, ser0…ser4).
+function seriesClasses(f) {
+  const first = s => Date.parse(s.first_at || "") || Math.min(...(s.points || []).map(p => Date.parse(p[0] + "T12:00:00Z")));
+  const order = (f.history || []).filter(s => s.points?.length).sort((a, b) => first(a) - first(b));
+  const one = order.length === 1;
+  return new Map(order.map((s, k) => [s.store, one ? "acc" : `ser${k % 5}`]));
 }
 
 // ── markup ──────────────────────────────────────────────────────────────────
@@ -232,9 +201,10 @@ function sectionShell(row, inner) {
 }
 
 function offersHTML(f) {
-  return `<div class="kp-offers">${f.offers.map((o, i) => `
+  const ser = seriesClasses(f);
+  return `<div class="kp-offers">${f.offers.map(o => `
       <div class="kp-offer">
-        <span class="kp-dot" style="background:${storeColor(o.store, i)}"></span>
+        <span class="kp-dot ${ser.get(o.store) || ""}"></span>
         <div class="kp-offer-main">
           <b>${host.esc(o.store_name || o.store)}</b>
           <small>${o.collected_at ? host.esc(tr("kpSeenAt", { at: when(o.collected_at) })) : ""}${o.published_at ? " · " + host.esc(tr("kpPublishedAt", { at: when(o.published_at) })) : ""}${o.in_stock ? "" : " · " + host.esc(tr("kpOutOfStock"))}</small>
@@ -275,7 +245,7 @@ export function kanbanPricesHTML(row) {
       <small>${host.esc(tr("kpAvgMin", { avg: money(f.avg_90d), min: money(f.min_90d), days: data.history_days || 90 }))}</small>
     </div>`;
   const note = m.exact ? "" : `<p class="kp-note">${host.esc(tr("kpOtherColor", { name: f.name }))}</p>`;
-  return sectionShell(row, `${note}${stats}${chartSVG(f.history, data.history_days || 90)}${offersHTML(f)}${couponsHTML(f)}`);
+  return sectionShell(row, `${note}${stats}${priceChartHTML(f.history, { days: data.history_days || 90, locale: locale(), label: { aria: tr("kpChartAria"), avg: v => tr("kpChartAvg", { v }), min: v => tr("kpChartMin", { v }), now: v => tr("kpChartNow", { v }) } })}${offersHTML(f)}${couponsHTML(f)}`);
 }
 
 /** One line under a low-stock tile: best monitored price + buy button ("" when not monitored). */
@@ -339,5 +309,6 @@ export function initKanbanPrices(opts = {}) {
   // Capture phase: a buy button inside a low-stock tile must not also trigger the tile itself.
   document.addEventListener("click", onClick, true);
   document.addEventListener("keydown", onKey, true);
+  wireChartTips(document);
   load();
 }

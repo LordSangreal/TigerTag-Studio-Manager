@@ -10,7 +10,8 @@ the prices the **Kanban price monitor** (`LordSangreal/kanban-promocoes-aliexpre
 - **Spool detail panel → "Monitored prices"** (above *Details*), only when the Kanban monitors that
   filament:
   - best current price, 90-day average and lowest price;
-  - a 90-day chart with one line per store (AliExpress, Shopee, Mercado Livre, Amazon);
+  - a 90-day chart drawn like the Kanban's own (`renderer/prices/chart.js`, a port of its
+    `priceChart`): one line per store in the Kanban's colours, or average + lowest + now for one store;
   - one row per store with its price, when that price was seen, when the deal was posted, and a
     **Buy** button (affiliate link; AliExpress also gets its coins link);
   - the latest coupons of those stores, with the date and time they were posted (tap to copy).
@@ -25,7 +26,8 @@ the prices the **Kanban price monitor** (`LordSangreal/kanban-promocoes-aliexpre
 
 | Piece | Where |
 |---|---|
-| Fetch, cache, matching, chart, clicks | `renderer/prices/index.js` |
+| Fetch, cache, matching, clicks | `renderer/prices/index.js` |
+| Price chart (same look as the Kanban) | `renderer/prices/chart.js` |
 | Texts (11 languages, kept out of `renderer/locales/` so upstream merges stay clean) | `renderer/prices/strings.js` |
 | Styles (theme tokens) | `renderer/prices/prices.css` |
 | Hooks in the upstream files | `renderer/inventory.js`: 1 import, 1 `initKanbanPrices(...)` line, `${kanbanPricesHTML(r)}` in `buildPanelHTML`, `kanbanStockBuyHTML(row)` in the low-stock tiles · `renderer/inventory.html`: 1 `<link>` |
